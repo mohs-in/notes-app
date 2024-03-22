@@ -2,24 +2,32 @@ import React from "react"
 import Sidebar from "/components/Sidebar.jsx"
 import Editor from "/components/Editor.jsx"
 import Split from "react-split"
-import { onSnapshot, addDoc } from "firebase/firestore"
-import { notesCollection } from "../firebase"
+import { onSnapshot, addDoc, doc, deleteDoc } from "firebase/firestore"
+import { notesCollection, db } from "../firebase"
 
 export default function App() {
     const [notes, setNotes] = React.useState([])
 
-    const [currentNoteId, setCurrentNoteId] = React.useState(
-        (notes[0] && notes[0].id) || ""
-    )
+    const [currentNoteId, setCurrentNoteId] = React.useState("")
+
+    const currentNote =
+        notes.find(note => note.id === currentNoteId)
+        || notes[0]
 
     React.useEffect(() => {
-        const unsubscribe = onSnapshot(notesCollection, (snapshot) => {
+        const unsubscribe = onSnapshot(notesCollection, function (snapshot) {
             const notesArr = snapshot.docs.map(doc => ({...doc.data(), id: doc.id}))
 
             setNotes(notesArr)
         })
         return unsubscribe
     },[])
+
+    React.useEffect(() => {
+        if (!currentNoteId) {
+            setCurrentNoteId(notes[0]?.id)
+        }
+    }, [notes])
 
     async function createNewNote() {
         const newNote = {
@@ -42,23 +50,11 @@ export default function App() {
             }
             return newArray
         })
-
-        // setNotes(oldNotes => oldNotes.map(oldNote => {
-        //     return oldNote.id === currentNoteId
-        //         ? { ...oldNote, body: text }
-        //         : oldNote
-        // }))
     }
     
-    function deleteNote(event, noteId) {
-        event.stopPropagation();
-        setNotes(prevNotes => prevNotes.filter(note => noteId !== note.id))    
-    }
-
-    function findCurrentNote() {
-        return notes.find(note => {
-            return note.id === currentNoteId
-        }) || notes[0]
+    async function deleteNote(noteId) {
+        const docRef = doc(db, "notes", noteId)
+        await deleteDoc(docRef)
     }
     
     return (
@@ -73,7 +69,7 @@ export default function App() {
             >
                 <Sidebar
                     notes={notes}
-                    currentNote={findCurrentNote()}
+                    currentNote={currentNote}
                     setCurrentNoteId={setCurrentNoteId}
                     newNote={createNewNote}
                     deleteNote={deleteNote}
@@ -82,7 +78,7 @@ export default function App() {
                     currentNoteId && 
                     notes.length > 0 &&
                     <Editor 
-                        currentNote={findCurrentNote()} 
+                        currentNote={currentNote} 
                         updateNote={updateNote} 
                     />
                 }
